@@ -212,20 +212,42 @@ router.post("/export", isLoggedIn, isSuperUser, async (req, res) => {
 
 		const kppAll = await Kpp.find({}).populate("clients").lean();
 
-		for (let client of clientsAll) {
-			const parking = [];
-			kppAll.map((kpp) => {
-				if (
-					kpp.clients.find(
-						(kppClient) =>
-							JSON.stringify(kppClient) === JSON.stringify(client)
-					)
-				) {
-					parking.push(kpp.name);
+		// for (let client of clientsAll) {
+		// 	const parking = [];
+		// 	kppAll.map((kpp) => {
+		// 		if (
+		// 			kpp.clients.find(
+		// 				(kppClient) =>
+		// 					JSON.stringify(kppClient) === JSON.stringify(client)
+		// 			)
+		// 		) {
+		// 			parking.push(kpp.name);
+		// 		}
+		// 	});
+		// 	client.parking = parking;
+		// }
+
+		const clientStrings = new Set(clientsAll.map(client => JSON.stringify(client)));
+
+		// Iterate through each KPP and build a map of KPP names to clients
+		const kppClientMap = new Map();
+		kppAll.forEach(kpp => {
+			kpp.clients.forEach(kppClient => {
+				const kppClientStr = JSON.stringify(kppClient);
+				if (clientStrings.has(kppClientStr)) {
+					if (!kppClientMap.has(kppClientStr)) {
+						kppClientMap.set(kppClientStr, []);
+					}
+					kppClientMap.get(kppClientStr).push(kpp.name);
 				}
 			});
-			client.parking = parking;
-		}
+		});
+
+		// Assign parking to each client
+		clientsAll.forEach(client => {
+			const clientStr = JSON.stringify(client);
+			client.parking = kppClientMap.get(clientStr) || [];
+		});
 
 		const csvHeaders = [
 			"_id",
